@@ -25,6 +25,7 @@ import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.tools.Diagnostic;
+import javax.tools.JavaFileObject;
 import java.io.File;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.ParameterizedType;
@@ -38,7 +39,7 @@ import java.util.*;
                 , Constants.LongPath, Constants.StringPath})
 public class EnityProcessor extends AbstractProcessor {
     private HashMap<Element, List<FieldAndAnnotation>> enities;
-    public final static String EnityCursorPath = "com.campus.system.menu";
+    public final static String EnityCursorPath = "com.campus.system.menu.processor";
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
@@ -176,8 +177,9 @@ public class EnityProcessor extends AbstractProcessor {
 
             JavaFile javaFile = JavaFile.builder(EnityCursorPath, typeBuilder.build())
                     .build();
+            Filer filer = processingEnv.getFiler();
             try {
-                javaFile.writeTo(new File("./src/main/java"));
+                javaFile.writeTo(new File(System.getProperty("user.dir") + "/src/main/java"));
                 System.out.println("生产类成功");
             } catch (Exception e) {
                 e.printStackTrace();
