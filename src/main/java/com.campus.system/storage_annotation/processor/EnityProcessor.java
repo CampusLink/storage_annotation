@@ -8,7 +8,7 @@ import com.campus.system.storage_annotation.annotation.LongProperty;
 import com.campus.system.storage_annotation.annotation.IntProperty;
 import com.campus.system.storage_annotation.annotation.Id;
 import com.campus.system.storage_annotation.annotation.StringProperty;
-import com.campus.system.storage_annotation.model.Date;
+import com.campus.system.storage_annotation.property.Property;
 import com.campus.system.storage_annotation.util.TextUtil;
 import com.google.auto.service.AutoService;
 import com.squareup.javapoet.*;
@@ -27,6 +27,7 @@ import javax.annotation.processing.SupportedSourceVersion;
 import javax.tools.Diagnostic;
 import java.io.File;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.ParameterizedType;
 import java.util.*;
 
 @AutoService(Processor.class)
@@ -167,6 +168,12 @@ public class EnityProcessor extends AbstractProcessor {
             //4.创建将ResultSet转化为实体的方法
             typeBuilder.addMethod(createParseToBean(element, fileds).build());
             System.out.println("parseToBean---->DONE");
+
+            System.out.println("saveBean---->");
+            //4.创建将ResultSet转化为实体的方法
+            typeBuilder.addMethod(createSaveBean(element, fileds).build());
+            System.out.println("saveBean---->DONE");
+
             JavaFile javaFile = JavaFile.builder(EnityCursorPath, typeBuilder.build())
                     .build();
             try {
@@ -288,7 +295,7 @@ public class EnityProcessor extends AbstractProcessor {
         for (FieldAndAnnotation item : fileds) {
             String name = item.mElement.getSimpleName().toString();
             setter.append("if(keys.contains(" +name+")){\n");
-            setter.append("set" + TextUtil.upcaseFirstForMethod(name) + "(t, resultSet);\n");
+            setter.append("     set" + TextUtil.upcaseFirstForMethod(name) + "(t, resultSet);\n");
             setter.append("}\n");
         }
         MethodSpec.Builder parseResultBuilder = MethodSpec.methodBuilder("parseResult")
@@ -306,6 +313,34 @@ public class EnityProcessor extends AbstractProcessor {
                 .addStatement("return list")
                 .returns(ParameterizedTypeName.get(ClassName.get("java.util", "List"), ClassName.get((TypeElement) element)));
         return parseResultBuilder;
+    }
+
+    private MethodSpec.Builder createSaveBean(Element element, List<FieldAndAnnotation> fileds){
+        StringBuilder setter = new StringBuilder();
+        setter.append("HashMap<Property, Object> properties = new HashMap();\n");
+        for(FieldAndAnnotation item : fileds){
+            String name = item.mElement.getSimpleName().toString();
+
+            if (item.mAnnotation instanceof Id || item.mAnnotation instanceof DoubleProperty
+                    || item.mAnnotation instanceof IntProperty || item.mAnnotation instanceof LongProperty) {
+                setter.append("if(enity.get" + TextUtil.upcaseFirstForMethod(name) + "()>0){\n");
+            } else if (item.mAnnotation instanceof StringProperty) {
+                setter.append("if(enity.get" + TextUtil.upcaseFirstForMethod(name) + "() != null && enity.get" + TextUtil.upcaseFirstForMethod(name)+"().length() > 0){\n");
+            } else if(item.mAnnotation instanceof DateProperty){
+                setter.append("if(!com.campus.system.storage_annotation.util.DateUtil.dateIsNull(enity.get" + TextUtil.upcaseFirstForMethod(name)+ "())){\n");
+            }
+            setter.append("     properties.put("+ name+", enity.get"+TextUtil.upcaseFirstForMethod(name)+"());\n");
+            setter.append("}\n");
+        }
+        setter.append("return properties;");
+
+        MethodSpec.Builder saveBeanBuilder = MethodSpec.methodBuilder("saveBean")
+                .addModifiers(Modifier.PUBLIC)
+                .addParameter(ClassName.get(element.asType()), "enity")
+                .addCode(setter.toString())
+                .returns(ParameterizedTypeName.get(HashMap.class, Property.class, Object.class));
+
+        return saveBeanBuilder;
     }
 
     public static class FieldAndAnnotation {
